@@ -24,6 +24,7 @@ from functools import partial
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.utils import model_zoo
 
 
 # Parameters for the entire model (stem, all blocks, and head)
@@ -274,13 +275,13 @@ def efficientnet_params(model_name):
     params_dict = {
         # Coefficients:   width,depth,res,dropout
         'efficientnet-b0': (1.0, 1.0, 224, 0.2),
-        # 'efficientnet-b1': (1.0, 1.1, 240, 0.2),
-        # 'efficientnet-b2': (1.1, 1.2, 260, 0.3),
-        # 'efficientnet-b3': (1.2, 1.4, 300, 0.3),
-        # 'efficientnet-b4': (1.4, 1.8, 380, 0.4),
-        # 'efficientnet-b5': (1.6, 2.2, 456, 0.4),
-        # 'efficientnet-b6': (1.8, 2.6, 528, 0.5),
-        # 'efficientnet-b7': (2.0, 3.1, 600, 0.5),
+        'efficientnet-b1': (1.0, 1.1, 240, 0.2),
+        'efficientnet-b2': (1.1, 1.2, 260, 0.3),
+        'efficientnet-b3': (1.2, 1.4, 300, 0.3),
+        'efficientnet-b4': (1.4, 1.8, 380, 0.4),
+        'efficientnet-b5': (1.6, 2.2, 456, 0.4),
+        'efficientnet-b6': (1.8, 2.6, 528, 0.5),
+        'efficientnet-b7': (2.0, 3.1, 600, 0.5),
     }
     return params_dict[model_name]
 
@@ -326,3 +327,28 @@ def get_model_params(model_name, override_params):
         # ValueError will be raised here if override_params has fields not included in global_params.
         global_params = global_params._replace(**override_params)
     return blocks_args, global_params
+
+
+url_map = {
+    'efficientnet-b0': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b0-355c32eb.pth',
+    'efficientnet-b1': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b1-f1951068.pth',
+    'efficientnet-b2': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b2-8bb594d6.pth',
+    'efficientnet-b3': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b3-5fb5a3c3.pth',
+    'efficientnet-b4': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b4-6ed6700e.pth',
+    'efficientnet-b5': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b5-b6417697.pth',
+    'efficientnet-b6': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b6-c76e70fd.pth',
+    'efficientnet-b7': 'http://storage.googleapis.com/public-models/efficientnet/efficientnet-b7-dcc49843.pth',
+}
+
+
+def load_pretrained_weights(model, model_name, load_fc=True):
+    """ Loads pretrained weights, and downloads if loading for the first time. """
+    state_dict = model_zoo.load_url(url_map[model_name])
+    if load_fc:
+        model.load_state_dict(state_dict)
+    else:
+        state_dict.pop('_fc.weight')
+        state_dict.pop('_fc.bias')
+        res = model.load_state_dict(state_dict, strict=False)
+        assert set(res.missing_keys) == set(['_fc.weight', '_fc.bias']), 'issue loading pretrained weights'
+    print('Loaded pretrained weights for {}'.format(model_name))

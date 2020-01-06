@@ -12,6 +12,7 @@
 # limitations under the License.
 # ==============================================================================
 
+__version__ = "0.1.0"
 from efficientnet.model import EfficientNet
 from efficientnet.utils import GlobalParams
 from efficientnet.utils import BlockArgs
