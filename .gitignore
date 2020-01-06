@@ -125,7 +125,7 @@ dmypy.json
 .pyre/
 
 # Datasets
-example/data 
+example/imagenet/data 
 
 # IDE file
 .vscode
