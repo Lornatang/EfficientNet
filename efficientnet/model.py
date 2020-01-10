@@ -16,15 +16,17 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from efficientnet.utils import round_filters
-from efficientnet.utils import round_repeats
-from efficientnet.utils import drop_connect
-from efficientnet.utils import get_same_padding_conv2d
-from efficientnet.utils import get_model_params
-from efficientnet.utils import efficientnet_params
-from efficientnet.utils import load_pretrained_weights
-from efficientnet.utils import Swish
-from efficientnet.utils import MemoryEfficientSwish
+from .utils import (
+    round_filters,
+    round_repeats,
+    drop_connect,
+    get_same_padding_conv2d,
+    get_model_params,
+    efficientnet_params,
+    load_pretrained_weights,
+    Swish,
+    MemoryEfficientSwish,
+)
 
 
 class MBConvBlock(nn.Module):
@@ -180,7 +182,6 @@ class EfficientNet(nn.Module):
         for block in self._blocks:
             block.set_swish(memory_efficient)
 
-
     def extract_features(self, inputs):
         """ Returns output of the final convolution layer """
 
@@ -219,15 +220,15 @@ class EfficientNet(nn.Module):
         return cls(blocks_args, global_params)
 
     @classmethod
-    def from_pretrained(cls, model_name, num_classes=1000, in_channels = 3):
+    def from_pretrained(cls, model_name, num_classes=1000, in_channels=3):
         model = cls.from_name(model_name, override_params={'num_classes': num_classes})
         load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000))
         if in_channels != 3:
-            Conv2d = get_same_padding_conv2d(image_size = model._global_params.image_size)
+            Conv2d = get_same_padding_conv2d(image_size=model._global_params.image_size)
             out_channels = round_filters(32, model._global_params)
             model._conv_stem = Conv2d(in_channels, out_channels, kernel_size=3, stride=2, bias=False)
         return model
-    
+
     @classmethod
     def from_pretrained(cls, model_name, num_classes=1000):
         model = cls.from_name(model_name, override_params={'num_classes': num_classes})

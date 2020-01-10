@@ -125,8 +125,12 @@ dmypy.json
 .pyre/
 
 # Datasets
-example/imagenet/data 
+examples/imagenet/data/train
+examples/imagenet/data/test
 
 # IDE file
 .vscode
 .idea
+
+# checkpoint
+*pth

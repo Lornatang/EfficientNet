@@ -26,47 +26,49 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils import model_zoo
 
+########################################################################
+############### HELPERS FUNCTIONS FOR MODEL ARCHITECTURE ###############
+########################################################################
+
 
 # Parameters for the entire model (stem, all blocks, and head)
 GlobalParams = collections.namedtuple('GlobalParams', [
     'batch_norm_momentum', 'batch_norm_epsilon', 'dropout_rate',
-    'width_coefficient', 'depth_coefficient','depth_divisor', 
-    'min_depth', 'drop_connect_rate', 'image_size',
-    'num_classes'])
+    'num_classes', 'width_coefficient', 'depth_coefficient',
+    'depth_divisor', 'min_depth', 'drop_connect_rate', 'image_size'])
 
 # Parameters for an individual model block
 BlockArgs = collections.namedtuple('BlockArgs', [
-    'kernel_size',  'stride', 'num_repeat', 'input_filters', 'output_filters',
-    'expand_ratio', 'id_skip','se_ratio'])
+    'kernel_size', 'num_repeat', 'input_filters', 'output_filters',
+    'expand_ratio', 'id_skip', 'stride', 'se_ratio'])
 
 # Change namedtuple defaults
 GlobalParams.__new__.__defaults__ = (None,) * len(GlobalParams._fields)
 BlockArgs.__new__.__defaults__ = (None,) * len(BlockArgs._fields)
 
 
-class Swish(nn.Module):
-    def forward(self, x):
-        return x * torch.sigmoid(x)
-
-
 class SwishImplementation(torch.autograd.Function):
-    """ Records operation history and defines formulas for differentiating ops. """
     @staticmethod
     def forward(ctx, i):
         result = i * torch.sigmoid(i)
         ctx.save_for_backward(i)
         return result
-    
+
     @staticmethod
-    def backward(ctx, grad_outputs):
+    def backward(ctx, grad_output):
         i = ctx.saved_variables[0]
         sigmoid_i = torch.sigmoid(i)
-        return grad_outputs * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
+        return grad_output * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
 
 
 class MemoryEfficientSwish(nn.Module):
     def forward(self, x):
         return SwishImplementation.apply(x)
+
+
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
 
 
 def round_filters(filters, global_params):
@@ -89,57 +91,29 @@ def round_repeats(repeats, global_params):
     multiplier = global_params.depth_coefficient
     if not multiplier:
         return repeats
-    """
-        >>> math.ceil(1)
-        1
-        >>> math.ceil(1.5)
-        2
-    """
     return int(math.ceil(multiplier * repeats))
 
 
 def drop_connect(inputs, p, training):
     """ Drop connect. """
-    if not training: return inputs
+    if not training:
+        return inputs
     batch_size = inputs.shape[0]
     keep_prob = 1 - p
     random_tensor = keep_prob
-    """
-        >>> random_tensor += torch.rand([batch_size, 1, 1, 1], dtype=inputs.dtype, device=inputs.device)
-        tensor([[[[1.7837]]],
-
-
-                [[[1.0871]]],
-
-
-                [[[1.2265]]],
-
-
-                [[[1.5304]]]])
-        >>> binary_tensor = torch.floor(random_tensor)
-        tensor([[[[1.]]],
-
-
-                [[[1.]]],
-
-
-                [[[1.]]],
-
-
-                [[[1.]]]])
-    """
     random_tensor += torch.rand([batch_size, 1, 1, 1], dtype=inputs.dtype, device=inputs.device)
     binary_tensor = torch.floor(random_tensor)
-    outputs = inputs / keep_prob * binary_tensor
-    return outputs
+    output = inputs / keep_prob * binary_tensor
+    return output
 
 
-class Identity(nn.Module):
-    def __init__(self, ):
-        super(Identity, self).__init__()
-
-    def forward(self, input):
-        return input
+def get_same_padding_conv2d(image_size=None):
+    """ Chooses static padding if you have specified an image size, and dynamic padding otherwise.
+        Static padding is necessary for ONNX exporting of models. """
+    if image_size is None:
+        return Conv2dDynamicSamePadding
+    else:
+        return partial(Conv2dStaticSamePadding, image_size=image_size)
 
 
 class Conv2dDynamicSamePadding(nn.Conv2d):
@@ -186,13 +160,34 @@ class Conv2dStaticSamePadding(nn.Conv2d):
         x = F.conv2d(x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
         return x
 
-def get_same_padding_conv2d(image_size=None):
-    """ Chooses static padding if you have specified an image size, and dynamic padding otherwise.
-        Static padding is necessary for ONNX exporting of models. """
-    if image_size is None:
-        return Conv2dDynamicSamePadding
-    else:
-        return partial(Conv2dStaticSamePadding, image_size=image_size)
+
+class Identity(nn.Module):
+    def __init__(self, ):
+        super(Identity, self).__init__()
+
+    def forward(self, input):
+        return input
+
+
+########################################################################
+############## HELPERS FUNCTIONS FOR LOADING MODEL PARAMS ##############
+########################################################################
+
+
+def efficientnet_params(model_name):
+    """ Map EfficientNet model name to parameter coefficients. """
+    params_dict = {
+        # Coefficients:   width,depth,res,dropout
+        'efficientnet-b0': (1.0, 1.0, 224, 0.2),
+        'efficientnet-b1': (1.0, 1.1, 240, 0.2),
+        'efficientnet-b2': (1.1, 1.2, 260, 0.3),
+        'efficientnet-b3': (1.2, 1.4, 300, 0.3),
+        'efficientnet-b4': (1.4, 1.8, 380, 0.4),
+        'efficientnet-b5': (1.6, 2.2, 456, 0.4),
+        'efficientnet-b6': (1.8, 2.6, 528, 0.5),
+        'efficientnet-b7': (2.0, 3.1, 600, 0.5),
+    }
+    return params_dict[model_name]
 
 
 class BlockDecoder(object):
@@ -270,22 +265,6 @@ class BlockDecoder(object):
         return block_strings
 
 
-def efficientnet_params(model_name):
-    """ Map EfficientNet model name to parameter coefficients. """
-    params_dict = {
-        # Coefficients:   width,depth,res,dropout
-        'efficientnet-b0': (1.0, 1.0, 224, 0.2),
-        'efficientnet-b1': (1.0, 1.1, 240, 0.2),
-        'efficientnet-b2': (1.1, 1.2, 260, 0.3),
-        'efficientnet-b3': (1.2, 1.4, 300, 0.3),
-        'efficientnet-b4': (1.4, 1.8, 380, 0.4),
-        'efficientnet-b5': (1.6, 2.2, 456, 0.4),
-        'efficientnet-b6': (1.8, 2.6, 528, 0.5),
-        'efficientnet-b7': (2.0, 3.1, 600, 0.5),
-    }
-    return params_dict[model_name]
-
-
 def efficientnet(width_coefficient=None, depth_coefficient=None, dropout_rate=0.2,
                  drop_connect_rate=0.2, image_size=None, num_classes=1000):
     """ Creates a efficientnet model. """
@@ -303,6 +282,7 @@ def efficientnet(width_coefficient=None, depth_coefficient=None, dropout_rate=0.
         batch_norm_epsilon=1e-3,
         dropout_rate=dropout_rate,
         drop_connect_rate=drop_connect_rate,
+        # data_format='channels_last',  # removed, this is always true in PyTorch
         num_classes=num_classes,
         width_coefficient=width_coefficient,
         depth_coefficient=depth_coefficient,
