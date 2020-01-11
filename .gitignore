@@ -125,8 +125,13 @@ dmypy.json
 .pyre/
 
 # Datasets
-examples/imagenet/data/train
-examples/imagenet/data/test
+examples/imagenet/data/Caltech101
+examples/imagenet/data/Caltech256
+examples/imagenet/data/Flowers
+examples/imagenet/data/Folio-Leaf
+examples/imagenet/data/Oxford-IIIT-Pet
+examples/imagenet/data/Stanford-Car
+examples/imagenet/data/Stanford-Dog
 
 # IDE file
 .vscode
