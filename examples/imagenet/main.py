@@ -269,7 +269,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.evaluate:
         top1, top5 = validate(val_loader, model, criterion, args)
         with open('res.txt', 'w') as f:
-            print(f"Acc@1: {res1}\tAcc@5: {res5}", file=f)
+            print(f"Acc@1: {top1}\tAcc@5: {top5}", file=f)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
