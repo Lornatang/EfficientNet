@@ -1,6 +1,6 @@
-# EfficientNet PyTorch
+# EfficientNet
 
-### Thanks 
+### Thanks [lukemelas](https://github.com/lukemelas)
 
 ### Overview
 This repository contains an op-for-op PyTorch reimplementation of [EfficientNet](https://arxiv.org/abs/1905.11946), along with pre-trained models and examples. 
