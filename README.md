@@ -2,6 +2,10 @@
 
 ### Thanks [lukemelas](https://github.com/lukemelas)
 
+### Update (January 12, 2020)
+
+This update allows you to use NVIDIA's Apex tool for accelerated training. By default choice `hybrid training precision` + `dynamic loss amplified` version, if you need to learn more and details about `apex` tools, please visit https://github.com/NVIDIA/apex.
+
 ### Overview
 This repository contains an op-for-op PyTorch reimplementation of [EfficientNet](https://arxiv.org/abs/1905.11946), along with pre-trained models and examples. 
 

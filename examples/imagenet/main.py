@@ -69,6 +69,8 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
+parser.add_argument('--opt_level', default="O1", type=str,
+                    help="Choose which accuracy to train. (default: 'O1')")
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
@@ -203,7 +205,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
+    model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
 
     # optionally resume from a checkpoint
     if args.resume:
