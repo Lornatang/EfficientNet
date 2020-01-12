@@ -100,7 +100,7 @@ Details about the models are below:
 
 #### Example: Classification
 
-Below is a simple, complete example. It may also be found as a jupyter notebook in `examples/simple` or as a [Colab Notebook](https://colab.research.google.com/drive/1Jw28xZ1NJq4Cja4jLe6tJ6_F5lCzElb4).
+Below is a simple, complete example. It may also be found as a jupyter notebook in `examples/simple`.
 
 We assume that in your current directory, there is a `img.jpg` file and a `labels_map.txt` file (ImageNet class names). These are both included in `examples/simple`. 
 
