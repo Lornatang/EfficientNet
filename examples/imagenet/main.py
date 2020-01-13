@@ -38,6 +38,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+from apex import amp
 from efficientnet import EfficientNet
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -96,13 +97,12 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+args = parser.parse_args()
 
 best_acc1 = 0
-args = parser.parse_args()
 
 
 def main():
-    args = parser.parse_args()
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -210,7 +210,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
+            print(f"=> loading checkpoint '{args.resume}'")
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_acc1']
@@ -220,10 +220,9 @@ def main_worker(gpu, ngpus_per_node, args):
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             amp.load_state_dict(checkpoint['amp'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpoint['epoch']))
+            print(f"=> loaded checkpoint '{args.resume}' (epoch {checkpoint['epoch']})")
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            print(f"=> no checkpoint found at '{args.resume}'")
 
     cudnn.benchmark = True
 
@@ -340,7 +339,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        loss.backward()
+        with amp.scale_loss(loss, optimizer) as scaled_loss:
+            scaled_loss.backward()
         optimizer.step()
 
         # measure elapsed time
