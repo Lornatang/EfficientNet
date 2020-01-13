@@ -240,14 +240,6 @@ def main_worker(gpu, ngpus_per_node, args):
             transforms.ToTensor(),
             normalize,
         ]))
-    test_dataset = datasets.CIFAR10(
-        root=args.data,
-        train=False,
-        download=True,
-        transform=transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ]))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -259,7 +251,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
     if 'efficientnet' in args.arch:
-        image_size = EfficientNet.get_image_size(args.arch)
+        image_size = 32
         val_transforms = transforms.Compose([
             transforms.Resize(image_size, interpolation=PIL.Image.BICUBIC),
             transforms.CenterCrop(image_size),
@@ -269,12 +261,19 @@ def main_worker(gpu, ngpus_per_node, args):
         print('Using image size', image_size)
     else:
         val_transforms = transforms.Compose([
-            transforms.Resize(36, interpolation=3),
-            transforms.CenterCrop(32),
+            transforms.Resize(36),
+            transforms.CenterCrop(24),
             transforms.ToTensor(),
             normalize,
         ])
-        print('Using image size', 32)
+        print('Using image size', 24)
+
+    test_dataset = datasets.CIFAR10(
+        root=args.data,
+        train=False,
+        download=True,
+        transform=val_transforms
+        )
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
