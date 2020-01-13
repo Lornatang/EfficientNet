@@ -262,11 +262,11 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         val_transforms = transforms.Compose([
             transforms.Resize(36),
-            transforms.CenterCrop(24),
+            transforms.CenterCrop(32),
             transforms.ToTensor(),
             normalize,
         ])
-        print('Using image size', 24)
+        print('Using image size', 32)
 
     test_dataset = datasets.CIFAR10(
         root=args.data,
