@@ -2,6 +2,23 @@
 
 ### Thanks [lukemelas](https://github.com/lukemelas)
 
+### Update (January 27, 2020)
+
+This update adds a new pre-training model based on confrontational training, called `advprop`.It should be noted that the pretreatment required for the `advprop` pre-training model is slightly different from conventional ImageNet pretreatment.Therefore, the `advprop` model is not used by `default.To` load a model with `advprop`, use:
+
+```text
+model = EfficientNet.from_pretrained("efficientnet-b0", advprop=True)
+```
+There is also a new, large `efficientnet-b8` pretrained model that is only available in advprop form. When using these models, replace ImageNet preprocessing code as follows:
+```text
+if advprop:  # for models using advprop pretrained weights
+    normalize = transforms.Lambda(lambda img: img * 2.0 - 1.0)
+else:
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                                     std=[0.229, 0.224, 0.225])
+
+```
+
 ### Update (January 12, 2020)
 
 This update allows you to use NVIDIA's Apex tool for accelerated training. By default choice `hybrid training precision` + `dynamic loss amplified` version, if you need to learn more and details about `apex` tools, please visit https://github.com/NVIDIA/apex.
