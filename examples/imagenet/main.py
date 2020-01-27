@@ -12,6 +12,7 @@
 # limitations under the License.
 # ==============================================================================
 
+
 """
 Evaluate on ImageNet. Note that at the moment, training is not implemented (I am working on it).
 that being said, evaluation is working.
@@ -38,14 +39,11 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
-from apex import amp
 from efficientnet import EfficientNet
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('--data', metavar='DIR', default='data',
+parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('name', metavar='DIR',
-                    help="dataset name.")
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture (default: resnet18)')
 parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
@@ -70,8 +68,6 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
-parser.add_argument('--opt_level', default="O1", type=str,
-                    help="Choose which accuracy to train. (default: 'O1')")
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
@@ -80,7 +76,7 @@ parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://172.168.1.1:11111', type=str,
+parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -90,19 +86,19 @@ parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
 parser.add_argument('--image_size', default=224, type=int,
                     help='image size')
-parser.add_argument('--num_classes', type=int, default=1000,
-                    help="number of dataset category.")
+parser.add_argument('--advprop', default=False, action='store_true',
+                    help='use advprop or not')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
-args = parser.parse_args()
 
 best_acc1 = 0
 
 
 def main():
+    args = parser.parse_args()
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -155,7 +151,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     if 'efficientnet' in args.arch:  # NEW
         if args.pretrained:
-            model = EfficientNet.from_pretrained(args.arch, num_classes=args.num_classes)
+            model = EfficientNet.from_pretrained(args.arch, advprop=args.advprop)
             print("=> using pre-trained model '{}'".format(args.arch))
         else:
             print("=> creating model '{}'".format(args.arch))
@@ -205,8 +201,6 @@ def main_worker(gpu, ngpus_per_node, args):
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
-
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
@@ -219,7 +213,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            amp.load_state_dict(checkpoint['amp'])
             print(f"=> loaded checkpoint '{args.resume}' (epoch {checkpoint['epoch']})")
         else:
             print(f"=> no checkpoint found at '{args.resume}'")
@@ -227,10 +220,13 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, args.name, 'train')
-    valdir = os.path.join(args.data, args.name, 'test')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    traindir = os.path.join(args.data, 'train')
+    valdir = os.path.join(args.data, 'val')
+    if args.advprop:
+        normalize = transforms.Lambda(lambda img: img * 2.0 - 1.0)
+    else:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
 
     train_dataset = datasets.ImageFolder(
         traindir,
@@ -274,9 +270,9 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        top1, top5 = validate(val_loader, model, criterion, args)
+        res = validate(val_loader, model, criterion, args)
         with open('res.txt', 'w') as f:
-            print(f"Acc@1: {top1}\tAcc@5: {top5}", file=f)
+            print(res, file=f)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -288,7 +284,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1, _ = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, args)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -302,14 +298,13 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer': optimizer.state_dict(),
-                'amp': amp.state_dict(),
             }, is_best)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
-    losses = AverageMeter('Loss', ':.6f')
+    losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), batch_time, data_time, losses, top1,
@@ -339,8 +334,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        with amp.scale_loss(loss, optimizer) as scaled_loss:
-            scaled_loss.backward()
+        loss.backward()
         optimizer.step()
 
         # measure elapsed time
@@ -353,7 +347,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
 def validate(val_loader, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.6f')
+    losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(val_loader), batch_time, losses, top1, top5,
@@ -390,13 +384,13 @@ def validate(val_loader, model, criterion, args):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg, top5.avg
+    return top1.avg
 
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth'):
+def save_checkpoint(state, is_best, filename="checkpoint.pth"):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, f"{args.arch}-for-{args.name}.pth")
+        shutil.copyfile(filename, "model_best.pth")
 
 
 class AverageMeter(object):
