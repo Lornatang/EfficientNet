@@ -16,27 +16,23 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .utils import (
-    round_filters,
-    round_repeats,
-    drop_connect,
-    get_same_padding_conv2d,
-    get_model_params,
-    efficientnet_params,
-    load_pretrained_weights,
-    Swish,
-    MemoryEfficientSwish,
-)
+from .utils import round_filters
+from .utils import round_repeats
+from .utils import drop_connect
+from .utils import get_model_params
+from .utils import get_same_padding_conv2d
+from .utils import efficientnet_params
+from .utils import load_pretrained_weights
+from .utils import Swish
+from .utils import MemoryEfficientSwish
 
 
 class MBConvBlock(nn.Module):
     """
     Mobile Inverted Residual Bottleneck Block
-
     Args:
         block_args (namedtuple): BlockArgs, see above
         global_params (namedtuple): GlobalParam, see above
-
     Attributes:
         has_se (bool): Whether the block contains a Squeeze and Excitation layer.
     """
@@ -116,14 +112,11 @@ class MBConvBlock(nn.Module):
 class EfficientNet(nn.Module):
     """
     An EfficientNet model. Most easily loaded with the .from_name or .from_pretrained methods
-
     Args:
         blocks_args (list): A list of BlockArgs to construct blocks
         global_params (namedtuple): A set of GlobalParams shared between blocks
-
     Example:
         model = EfficientNet.from_pretrained('efficientnet-b0')
-
     """
 
     def __init__(self, blocks_args=None, global_params=None):
@@ -220,9 +213,13 @@ class EfficientNet(nn.Module):
         return cls(blocks_args, global_params)
 
     @classmethod
-    def from_pretrained(cls, model_name, num_classes=1000):
-        model = cls.from_name(model_name, override_params={'num_classes': num_classes})
-        load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000))
+    def from_pretrained(cls, model_name, advprop=False, num_classes=1000, in_channels=3):
+        model = cls.from_name(model_name, override_params={"num_classes": num_classes})
+        load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000), advprop=advprop)
+        if in_channels != 3:
+            Conv2d = get_same_padding_conv2d(image_size=model._global_params.image_size)
+            out_channels = round_filters(32, model._global_params)
+            model._conv_stem = Conv2d(in_channels, out_channels, kernel_size=3, stride=2, bias=False)
         return model
 
     @classmethod
@@ -232,10 +229,8 @@ class EfficientNet(nn.Module):
         return res
 
     @classmethod
-    def _check_model_name_is_valid(cls, model_name, also_need_pretrained_weights=False):
-        """ Validates model name. None that pretrained weights are only available for
-        the first four models (efficientnet-b{i} for i in 0,1,2,3) at the moment. """
-        num_models = 4 if also_need_pretrained_weights else 8
-        valid_models = ['efficientnet-b'+str(i) for i in range(num_models)]
+    def _check_model_name_is_valid(cls, model_name):
+        """ Validates model name. """
+        valid_models = ['efficientnet-b'+str(i) for i in range(9)]
         if model_name not in valid_models:
             raise ValueError('model_name should be one of: ' + ', '.join(valid_models))
