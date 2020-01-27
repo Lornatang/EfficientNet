@@ -17,8 +17,8 @@ DESCRIPTION = 'EfficientNet.'
 URL = 'https://github.com/lornatang/EfficientNet'
 EMAIL = 'liuchangyu1111@gmail.com'
 AUTHOR = 'Changyu'
-REQUIRES_PYTHON = '>=3.5.0'
-VERSION = '0.3.0'
+REQUIRES_PYTHON = '>=3.6.0'
+VERSION = '0.3.1'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
