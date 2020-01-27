@@ -29,7 +29,8 @@ image_size = 224
 img = Image.open('img.jpg')
 
 # Preprocess image
-tfms = transforms.Compose([transforms.Resize(image_size), transforms.CenterCrop(image_size),
+tfms = transforms.Compose([transforms.Resize(image_size),
+                           transforms.CenterCrop(image_size),
                            transforms.ToTensor(),
                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]), ])
 img = tfms(img).unsqueeze(0)
@@ -38,10 +39,11 @@ img = tfms(img).unsqueeze(0)
 labels_map = json.load(open('labels_map.txt'))
 labels_map = [labels_map[str(i)] for i in range(1000)]
 
-# Classify with AlexNet
+# Classify with EfficientNet
 print("=> loading checkpoint 'efficientnet-b0'.")
 model = EfficientNet.from_pretrained('efficientnet-b0')
 print("=> loaded checkpoint 'efficientnet-b0'.")
+
 model.eval()
 with torch.no_grad():
     logits = model(img)
@@ -51,4 +53,4 @@ print('-----')
 for idx in preds:
     label = labels_map[idx]
     prob = torch.softmax(logits, dim=1)[0, idx].item()
-    print('{:<75} ({:.2f}%)'.format(label, prob * 100))
+    print(f"{label:<75} ({prob * 100:.2f}%)")
